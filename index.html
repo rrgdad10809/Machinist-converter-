@@ -34,16 +34,17 @@
       font-size: 20px;
       padding: 10px;
       border-radius: 10px;
-      width: 220px;
+      width: 280px;
+      max-width: 95%;
     }
 
-    .display {
+    .display, .fs-box {
       background: #000;
       border: 2px solid #0f0;
       border-radius: 14px;
       padding: 16px;
       margin: 14px auto;
-      max-width: 340px;
+      max-width: 360px;
     }
 
     .input-label, .output-label {
@@ -104,7 +105,8 @@
     }
 
     .num-btn:active,
-    .action-btn:active {
+    .action-btn:active,
+    .field-btn:active {
       transform: scale(0.98);
     }
 
@@ -113,24 +115,127 @@
       color: #aaa;
       font-size: 14px;
     }
+
+    .hidden {
+      display: none;
+    }
+
+    .fs-title {
+      font-size: 22px;
+      color: #00ffcc;
+      margin-bottom: 14px;
+    }
+
+    .field-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      max-width: 360px;
+      margin: 0 auto 14px;
+    }
+
+    .field-btn {
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 16px;
+    }
+
+    .field-btn.active {
+      border: 2px solid #00ffcc;
+      color: #00ffcc;
+    }
+
+    .fs-row {
+      text-align: left;
+      margin: 10px 0;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .fs-row span {
+      color: #00ffcc;
+      font-weight: bold;
+    }
+
+    .fs-results {
+      margin-top: 16px;
+      border-top: 1px solid #333;
+      padding-top: 12px;
+    }
+
+    .mini-label {
+      color: #9ff;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .selected-field {
+      margin: 10px 0 6px;
+      color: #9ff;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <h1>Machinist Converter</h1>
-  <div class="sub">Inch ↔ Millimeter with keypad and voice</div>
+  <div class="sub">Converter, keypad, voice, and feeds & speeds</div>
 
   <div class="mode-wrap">
-    <select id="mode" onchange="convert()">
-      <option value="in_to_mm">Inches → Millimeters</option>
-      <option value="mm_to_in">Millimeters → Inches</option>
+    <select id="appMode" onchange="switchAppMode()">
+      <option value="converter">Converter Mode</option>
+      <option value="feeds">Feeds & Speeds Mode</option>
     </select>
   </div>
 
-  <div class="display">
-    <div class="input-label" id="inputLabel">Inches</div>
-    <div id="inputValue">0</div>
-    <div class="output-label" id="outputLabel">Millimeters</div>
-    <div id="result">0.0000</div>
+  <div id="converterSection">
+    <div class="mode-wrap">
+      <select id="mode" onchange="convert()">
+        <option value="in_to_mm">Inches → Millimeters</option>
+        <option value="mm_to_in">Millimeters → Inches</option>
+      </select>
+    </div>
+
+    <div class="display">
+      <div class="input-label" id="inputLabel">Inches</div>
+      <div id="inputValue">0</div>
+      <div class="output-label" id="outputLabel">Millimeters</div>
+      <div id="result">0.0000</div>
+    </div>
+  </div>
+
+  <div id="feedsSection" class="hidden">
+    <div class="fs-box">
+      <div class="fs-title">Feeds & Speeds</div>
+
+      <div class="selected-field">
+        Editing: <span id="selectedFieldName">Tool Dia</span>
+      </div>
+
+      <div class="field-buttons">
+        <button class="field-btn active" id="btn_toolDia" onclick="selectFsField('toolDia')">Tool Dia</button>
+        <button class="field-btn" id="btn_flutes" onclick="selectFsField('flutes')">Flutes</button>
+        <button class="field-btn" id="btn_chipLoad" onclick="selectFsField('chipLoad')">Chip Load</button>
+        <button class="field-btn" id="btn_sfm" onclick="selectFsField('sfm')">SFM</button>
+      </div>
+
+      <div class="display">
+        <div class="mini-label">Current entry</div>
+        <div id="fsInputValue">0</div>
+      </div>
+
+      <div class="fs-row">Tool Dia: <span id="show_toolDia">0</span> in</div>
+      <div class="fs-row">Flutes: <span id="show_flutes">0</span></div>
+      <div class="fs-row">Chip Load: <span id="show_chipLoad">0</span> in/tooth</div>
+      <div class="fs-row">SFM: <span id="show_sfm">0</span></div>
+
+      <div class="fs-results">
+        <div class="fs-row">RPM: <span id="show_rpm">0</span></div>
+        <div class="fs-row">Feed Rate: <span id="show_feed">0</span> IPM</div>
+      </div>
+    </div>
   </div>
 
   <div class="button-row">
@@ -157,10 +262,39 @@
     <button class="num-btn" onclick="appendValue('-')">-</button>
   </div>
 
-  <div class="hint">Voice works best in Safari or Chrome when microphone permission is allowed.</div>
+  <div class="hint">
+    Voice commands: clear, reset, zero, back, delete, inch, millimeters, converter mode, feeds mode
+  </div>
 
   <script>
     let currentInput = "0";
+
+    let fsData = {
+      toolDia: "0",
+      flutes: "0",
+      chipLoad: "0",
+      sfm: "0"
+    };
+
+    let selectedFsField = "toolDia";
+
+    function switchAppMode() {
+      const appMode = document.getElementById("appMode").value;
+      const converterSection = document.getElementById("converterSection");
+      const feedsSection = document.getElementById("feedsSection");
+
+      if (appMode === "converter") {
+        converterSection.classList.remove("hidden");
+        feedsSection.classList.add("hidden");
+        currentInput = currentInput || "0";
+        refreshDisplay();
+      } else {
+        converterSection.classList.add("hidden");
+        feedsSection.classList.remove("hidden");
+        currentInput = fsData[selectedFsField] || "0";
+        refreshDisplay();
+      }
+    }
 
     function updateLabels() {
       const mode = document.getElementById("mode").value;
@@ -177,6 +311,7 @@
         } else {
           currentInput = '-' + (currentInput === "0" ? "" : currentInput);
         }
+        saveCurrentInput();
         refreshDisplay();
         return;
       }
@@ -189,11 +324,13 @@
         currentInput += val;
       }
 
+      saveCurrentInput();
       refreshDisplay();
     }
 
     function clearInput() {
       currentInput = "0";
+      saveCurrentInput();
       refreshDisplay();
     }
 
@@ -203,18 +340,36 @@
       } else {
         currentInput = currentInput.slice(0, -1);
       }
+      saveCurrentInput();
       refreshDisplay();
     }
 
+    function saveCurrentInput() {
+      const appMode = document.getElementById("appMode").value;
+      if (appMode === "feeds") {
+        fsData[selectedFsField] = currentInput;
+      }
+    }
+
     function refreshDisplay() {
-      document.getElementById("inputValue").textContent = currentInput;
-      convert();
+      const appMode = document.getElementById("appMode").value;
+
+      if (appMode === "converter") {
+        document.getElementById("inputValue").textContent = currentInput;
+        convert();
+      } else {
+        document.getElementById("fsInputValue").textContent = currentInput;
+        document.getElementById("show_toolDia").textContent = fsData.toolDia;
+        document.getElementById("show_flutes").textContent = fsData.flutes;
+        document.getElementById("show_chipLoad").textContent = fsData.chipLoad;
+        document.getElementById("show_sfm").textContent = fsData.sfm;
+        calculateFeedsSpeeds();
+      }
     }
 
     function convert() {
       updateLabels();
 
-      const mode = document.getElementById("mode").value;
       const num = parseFloat(currentInput);
 
       if (isNaN(num)) {
@@ -222,7 +377,9 @@
         return;
       }
 
+      const mode = document.getElementById("mode").value;
       let output;
+
       if (mode === "in_to_mm") {
         output = num * 25.4;
       } else {
@@ -232,87 +389,177 @@
       document.getElementById("result").textContent = output.toFixed(4);
     }
 
-    function startVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    function selectFsField(field) {
+      selectedFsField = field;
 
-  if (!SpeechRecognition) {
-    alert("Voice input is not supported on this device/browser.");
-    return;
-  }
+      document.querySelectorAll(".field-btn").forEach(btn => btn.classList.remove("active"));
+      document.getElementById("btn_" + field).classList.add("active");
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+      const names = {
+        toolDia: "Tool Dia",
+        flutes: "Flutes",
+        chipLoad: "Chip Load",
+        sfm: "SFM"
+      };
 
-  recognition.onresult = function(event) {
-    let spoken = event.results[0][0].transcript.toLowerCase().trim();
-
-    // ✅ CLEAR COMMANDS
-    if (
-      spoken.includes("clear") ||
-      spoken.includes("reset") ||
-      spoken.includes("zero")
-    ) {
-      clearInput();
-      return;
-    }
-
-    // ✅ BACKSPACE COMMAND
-    if (
-      spoken.includes("back") ||
-      spoken.includes("delete")
-    ) {
-      backspace();
-      return;
-    }
-
-    // ✅ MODE SWITCHING
-    if (
-      spoken.includes("inch") ||
-      spoken.includes("inches")
-    ) {
-      document.getElementById("mode").value = "in_to_mm";
-      convert();
-      return;
-    }
-
-    if (
-      spoken.includes("millimeter") ||
-      spoken.includes("millimeters") ||
-      spoken.includes("mm")
-    ) {
-      document.getElementById("mode").value = "mm_to_in";
-      convert();
-      return;
-    }
-
-    // 🔢 NUMBER CLEANUP
-    spoken = spoken
-      .replace(/minus/g, "-")
-      .replace(/negative/g, "-")
-      .replace(/point/g, ".")
-      .replace(/[^0-9.\-]/g, "");
-
-    if (spoken && spoken !== "-" && spoken !== ".") {
-      currentInput = spoken;
+      document.getElementById("selectedFieldName").textContent = names[field];
+      currentInput = fsData[field] || "0";
       refreshDisplay();
     }
-  };
 
-  recognition.onerror = function() {
-    alert("Voice input failed. Please try again.");
-  };
+    function calculateFeedsSpeeds() {
+      const dia = parseFloat(fsData.toolDia);
+      const flutes = parseFloat(fsData.flutes);
+      const chip = parseFloat(fsData.chipLoad);
+      const sfm = parseFloat(fsData.sfm);
 
-  recognition.start();
-}
+      let rpm = 0;
+      let feed = 0;
+
+      if (!isNaN(dia) && !isNaN(flutes) && !isNaN(chip) && !isNaN(sfm) && dia > 0) {
+        rpm = (sfm * 3.82) / dia;
+        feed = rpm * flutes * chip;
+      }
+
+      document.getElementById("show_rpm").textContent = rpm > 0 ? Math.round(rpm) : "0";
+      document.getElementById("show_feed").textContent = feed > 0 ? feed.toFixed(3) : "0";
+    }
+
+    function startVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        alert("Voice input is not supported on this device/browser.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = function(event) {
+        let spoken = event.results[0][0].transcript.toLowerCase().trim();
+
+        if (
+          spoken.includes("converter mode") ||
+          spoken.includes("converter")
+        ) {
+          document.getElementById("appMode").value = "converter";
+          switchAppMode();
+          return;
+        }
+
+        if (
+          spoken.includes("feeds mode") ||
+          spoken.includes("feeds and speeds") ||
+          spoken.includes("feeds")
+        ) {
+          document.getElementById("appMode").value = "feeds";
+          switchAppMode();
+          return;
+        }
+
+        if (
+          spoken.includes("clear") ||
+          spoken.includes("reset") ||
+          spoken.includes("zero")
+        ) {
+          clearInput();
+          return;
+        }
+
+        if (
+          spoken.includes("back") ||
+          spoken.includes("delete")
+        ) {
+          backspace();
+          return;
+        }
+
+        if (
+          spoken.includes("inch") ||
+          spoken.includes("inches")
+        ) {
+          document.getElementById("mode").value = "in_to_mm";
+          convert();
+          return;
+        }
+
+        if (
+          spoken.includes("millimeter") ||
+          spoken.includes("millimeters") ||
+          spoken.includes("mm")
+        ) {
+          document.getElementById("mode").value = "mm_to_in";
+          convert();
+          return;
+        }
+
+        if (spoken.includes("tool diameter") || spoken.includes("tool dia")) {
+          if (document.getElementById("appMode").value !== "feeds") {
+            document.getElementById("appMode").value = "feeds";
+            switchAppMode();
+          }
+          selectFsField("toolDia");
+          return;
+        }
+
+        if (spoken.includes("flutes") || spoken.includes("flute")) {
+          if (document.getElementById("appMode").value !== "feeds") {
+            document.getElementById("appMode").value = "feeds";
+            switchAppMode();
+          }
+          selectFsField("flutes");
+          return;
+        }
+
+        if (spoken.includes("chip load")) {
+          if (document.getElementById("appMode").value !== "feeds") {
+            document.getElementById("appMode").value = "feeds";
+            switchAppMode();
+          }
+          selectFsField("chipLoad");
+          return;
+        }
+
+        if (spoken.includes("sfm")) {
+          if (document.getElementById("appMode").value !== "feeds") {
+            document.getElementById("appMode").value = "feeds";
+            switchAppMode();
+          }
+          selectFsField("sfm");
+          return;
+        }
+
+        spoken = spoken
+          .replace(/minus/g, "-")
+          .replace(/negative/g, "-")
+          .replace(/point/g, ".")
+          .replace(/[^0-9.\-]/g, "");
+
+        if (spoken && spoken !== "-" && spoken !== ".") {
+          currentInput = spoken;
+          saveCurrentInput();
+          refreshDisplay();
+        }
+      };
+
+      recognition.onerror = function() {
+        alert("Voice input failed. Please try again.");
+      };
+
+      recognition.start();
+    }
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
     }
 
     updateLabels();
-    refreshDisplay();
+    selectFsField("toolDia");
+    document.getElementById("appMode").value = "converter";
+    switchAppMode();
   </script>
 </body>
 </html>

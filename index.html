@@ -1,49 +1,278 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="manifest" href="manifest.json">
-<title>Machinist Converter</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <title>Machinist Converter</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #0f0;
+      text-align: center;
+      padding: 18px;
+      margin: 0;
+    }
 
-<style>
-body { font-family: Arial; background:#111; color:#0f0; text-align:center; padding:20px; }
-input { font-size:28px; padding:12px; width:220px; text-align:center; }
-.result { font-size:40px; margin-top:20px; color:#00ffcc; }
-button { margin-top:15px; padding:10px; font-size:16px; }
-</style>
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .sub {
+      color: #9ff;
+      margin-bottom: 18px;
+      font-size: 16px;
+    }
+
+    .mode-wrap {
+      margin-bottom: 16px;
+    }
+
+    select {
+      font-size: 20px;
+      padding: 10px;
+      border-radius: 10px;
+      width: 220px;
+    }
+
+    .display {
+      background: #000;
+      border: 2px solid #0f0;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 14px auto;
+      max-width: 340px;
+    }
+
+    .input-label, .output-label {
+      font-size: 15px;
+      color: #9ff;
+      margin-bottom: 6px;
+    }
+
+    #inputValue {
+      font-size: 34px;
+      min-height: 42px;
+      word-break: break-all;
+      color: #fff;
+    }
+
+    #result {
+      font-size: 38px;
+      margin-top: 10px;
+      color: #00ffcc;
+      word-break: break-word;
+    }
+
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 12px 0 18px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-size: 20px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .action-btn {
+      min-width: 110px;
+    }
+
+    .numpad {
+      max-width: 340px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .num-btn {
+      font-size: 30px;
+      padding: 18px 0;
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 14px;
+    }
+
+    .num-btn:active,
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+
+    .hint {
+      margin-top: 16px;
+      color: #aaa;
+      font-size: 14px;
+    }
+  </style>
 </head>
-
 <body>
+  <h1>Machinist Converter</h1>
+  <div class="sub">Inch ↔ Millimeter with keypad and voice</div>
 
-<h2>Machinist Converter</h2>
-<p>Inches → mm (÷25.4)</p>
+  <div class="mode-wrap">
+    <select id="mode" onchange="convert()">
+      <option value="in_to_mm">Inches → Millimeters</option>
+      <option value="mm_to_in">Millimeters → Inches</option>
+    </select>
+  </div>
 
-<input id="inches" type="number" step="any" oninput="convert()" placeholder="Enter inches">
+  <div class="display">
+    <div class="input-label" id="inputLabel">Inches</div>
+    <div id="inputValue">0</div>
+    <div class="output-label" id="outputLabel">Millimeters</div>
+    <div id="result">0.0000</div>
+  </div>
 
-<div class="result" id="output">0 mm</div>
+  <div class="button-row">
+    <button class="action-btn" onclick="clearInput()">Clear</button>
+    <button class="action-btn" onclick="backspace()">⌫</button>
+    <button class="action-btn" onclick="startVoice()">🎤 Voice</button>
+  </div>
 
-<button onclick="clearBox()">Clear</button>
+  <div class="numpad">
+    <button class="num-btn" onclick="appendValue('7')">7</button>
+    <button class="num-btn" onclick="appendValue('8')">8</button>
+    <button class="num-btn" onclick="appendValue('9')">9</button>
 
-<script>
-function convert() {
-  let val = document.getElementById("inches").value;
-  let mm = val / 25.4;
-  document.getElementById("output").innerText =
-    (mm ? mm.toFixed(4) : "0") + " mm";
-}
+    <button class="num-btn" onclick="appendValue('4')">4</button>
+    <button class="num-btn" onclick="appendValue('5')">5</button>
+    <button class="num-btn" onclick="appendValue('6')">6</button>
 
-function clearBox(){
-  document.getElementById("inches").value = "";
-  document.getElementById("output").innerText = "0 mm";
-}
-</script>
+    <button class="num-btn" onclick="appendValue('1')">1</button>
+    <button class="num-btn" onclick="appendValue('2')">2</button>
+    <button class="num-btn" onclick="appendValue('3')">3</button>
 
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
-}
-</script>
+    <button class="num-btn" onclick="appendValue('0')">0</button>
+    <button class="num-btn" onclick="appendValue('.')">.</button>
+    <button class="num-btn" onclick="appendValue('-')">-</button>
+  </div>
 
+  <div class="hint">Voice works best in Safari or Chrome when microphone permission is allowed.</div>
+
+  <script>
+    let currentInput = "0";
+
+    function updateLabels() {
+      const mode = document.getElementById("mode").value;
+      document.getElementById("inputLabel").textContent =
+        mode === "in_to_mm" ? "Inches" : "Millimeters";
+      document.getElementById("outputLabel").textContent =
+        mode === "in_to_mm" ? "Millimeters" : "Inches";
+    }
+
+    function appendValue(val) {
+      if (val === '-') {
+        if (currentInput.startsWith('-')) {
+          currentInput = currentInput.substring(1);
+        } else {
+          currentInput = '-' + (currentInput === "0" ? "" : currentInput);
+        }
+        refreshDisplay();
+        return;
+      }
+
+      if (val === '.' && currentInput.includes('.')) return;
+
+      if (currentInput === "0" && val !== ".") {
+        currentInput = val;
+      } else {
+        currentInput += val;
+      }
+
+      refreshDisplay();
+    }
+
+    function clearInput() {
+      currentInput = "0";
+      refreshDisplay();
+    }
+
+    function backspace() {
+      if (currentInput.length <= 1 || (currentInput.length === 2 && currentInput.startsWith('-'))) {
+        currentInput = "0";
+      } else {
+        currentInput = currentInput.slice(0, -1);
+      }
+      refreshDisplay();
+    }
+
+    function refreshDisplay() {
+      document.getElementById("inputValue").textContent = currentInput;
+      convert();
+    }
+
+    function convert() {
+      updateLabels();
+
+      const mode = document.getElementById("mode").value;
+      const num = parseFloat(currentInput);
+
+      if (isNaN(num)) {
+        document.getElementById("result").textContent = "0.0000";
+        return;
+      }
+
+      let output;
+      if (mode === "in_to_mm") {
+        output = num * 25.4;
+      } else {
+        output = num / 25.4;
+      }
+
+      document.getElementById("result").textContent = output.toFixed(4);
+    }
+
+    function startVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        alert("Voice input is not supported on this device/browser.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = function(event) {
+        let spoken = event.results[0][0].transcript.toLowerCase();
+
+        spoken = spoken
+          .replace(/minus/g, "-")
+          .replace(/negative/g, "-")
+          .replace(/point/g, ".")
+          .replace(/[^0-9.\-]/g, "");
+
+        if (spoken && spoken !== "-" && spoken !== ".") {
+          currentInput = spoken;
+          refreshDisplay();
+        }
+      };
+
+      recognition.onerror = function() {
+        alert("Voice input failed. Please try again.");
+      };
+
+      recognition.start();
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+
+    updateLabels();
+    refreshDisplay();
+  </script>
 </body>
 </html>

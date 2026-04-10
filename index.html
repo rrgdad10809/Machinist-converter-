@@ -233,39 +233,79 @@
     }
 
     function startVoice() {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-      if (!SpeechRecognition) {
-        alert("Voice input is not supported on this device/browser.");
-        return;
-      }
+  if (!SpeechRecognition) {
+    alert("Voice input is not supported on this device/browser.");
+    return;
+  }
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = "en-US";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
 
-      recognition.onresult = function(event) {
-        let spoken = event.results[0][0].transcript.toLowerCase();
+  recognition.onresult = function(event) {
+    let spoken = event.results[0][0].transcript.toLowerCase().trim();
 
-        spoken = spoken
-          .replace(/minus/g, "-")
-          .replace(/negative/g, "-")
-          .replace(/point/g, ".")
-          .replace(/[^0-9.\-]/g, "");
-
-        if (spoken && spoken !== "-" && spoken !== ".") {
-          currentInput = spoken;
-          refreshDisplay();
-        }
-      };
-
-      recognition.onerror = function() {
-        alert("Voice input failed. Please try again.");
-      };
-
-      recognition.start();
+    // ✅ CLEAR COMMANDS
+    if (
+      spoken.includes("clear") ||
+      spoken.includes("reset") ||
+      spoken.includes("zero")
+    ) {
+      clearInput();
+      return;
     }
+
+    // ✅ BACKSPACE COMMAND
+    if (
+      spoken.includes("back") ||
+      spoken.includes("delete")
+    ) {
+      backspace();
+      return;
+    }
+
+    // ✅ MODE SWITCHING
+    if (
+      spoken.includes("inch") ||
+      spoken.includes("inches")
+    ) {
+      document.getElementById("mode").value = "in_to_mm";
+      convert();
+      return;
+    }
+
+    if (
+      spoken.includes("millimeter") ||
+      spoken.includes("millimeters") ||
+      spoken.includes("mm")
+    ) {
+      document.getElementById("mode").value = "mm_to_in";
+      convert();
+      return;
+    }
+
+    // 🔢 NUMBER CLEANUP
+    spoken = spoken
+      .replace(/minus/g, "-")
+      .replace(/negative/g, "-")
+      .replace(/point/g, ".")
+      .replace(/[^0-9.\-]/g, "");
+
+    if (spoken && spoken !== "-" && spoken !== ".") {
+      currentInput = spoken;
+      refreshDisplay();
+    }
+  };
+
+  recognition.onerror = function() {
+    alert("Voice input failed. Please try again.");
+  };
+
+  recognition.start();
+}
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js');
